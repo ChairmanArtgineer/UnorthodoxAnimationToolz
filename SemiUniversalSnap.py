@@ -13,7 +13,7 @@ def getPoleBone(ArmatureObject, active):
     #ik constraint bones    
     for bone in ArmatureObject.pose.bones:
         for constraint in bone.constraints:
-            if constraint == bone.constraints["IK"]:
+            if constraint.name == "IK":
                 if constraint.subtarget == active:
                     return [bone.parent.name, bone.name,  constraint.subtarget, constraint.pole_subtarget]
                 

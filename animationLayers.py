@@ -122,7 +122,7 @@ class OBJECT_PT_animation_layers_panel(bpy.types.Panel):
         obj = bpy.context.active_object
         try:
             nla_tracks = obj.animation_data.nla_tracks
-            print("exists")
+            #print("exists")
         except:
             obj.animation_data_create()
             pass
