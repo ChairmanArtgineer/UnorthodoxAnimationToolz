@@ -13,12 +13,19 @@ def getPoleBone(ArmatureObject, active):
     #ik constraint bones    
     for bone in ArmatureObject.pose.bones:
         for constraint in bone.constraints:
-            if constraint == bone.constraints["IK"]:
+            if constraint.name == "IK":
                 if constraint.subtarget == active:
                     return [bone.parent.name, bone.name,  constraint.subtarget, constraint.pole_subtarget]
                 
                 
-
+def find_follow(obj,bone):
+    """find follow from ik or fk bones"""
+    if bone:
+        if "IK_" in bone.name or "FK_" in bone.name:
+            if bone.name[3:] in obj.pose.bones:
+                ogbone = obj.pose.bones[bone.name[3:]]
+                if "Follow" in ogbone:
+                    return ogbone
     
 def ik_to_fk():
         # Loop through each bone in the armature
@@ -69,6 +76,10 @@ class OT_Ik_Snap(bpy.types.Operator):
 
     def execute(self, context):
             ik_to_fk()
+            if find_follow(context.object, context.active_pose_bone):
+                find_follow(context.object, context.active_pose_bone)["Follow"] = 0.0
+                find_follow(context.object, context.active_pose_bone).keyframe_insert('["Follow"]')
+
             return {'FINISHED'}
 class OT_Fk_Snap(bpy.types.Operator):
     """snap fk boens to ik """
@@ -77,6 +88,10 @@ class OT_Fk_Snap(bpy.types.Operator):
 
     def execute(self, context):
             fk_to_ik()
+            if find_follow(context.object, context.active_pose_bone):
+                find_follow(context.object, context.active_pose_bone)["Follow"] = 1.0
+                find_follow(context.object, context.active_pose_bone).keyframe_insert('["Follow"]')
+
             return {'FINISHED'}
     
 class VIEW3D_MT_PIE(bpy.types.Menu):
@@ -86,8 +101,8 @@ class VIEW3D_MT_PIE(bpy.types.Menu):
     bl_idname = "VIEW3D_MT_PIE"
     @classmethod
     def poll(cls, context):
-         if bpy.context.object.mode == 'POSE':
-            return context.active_object is not None
+
+        return context.object.mode == 'POSE'
      
     
                
@@ -101,20 +116,24 @@ class VIEW3D_MT_PIE(bpy.types.Menu):
             pie = pie.column()
             # operator_enum will just spread all available options
             # for the type enum of the operator on the pie
-            if bpy.context.selected_pose_bones:
-                active =  bpy.context.active_pose_bone.name
+            if context.selected_pose_bones:
+                active = context.active_pose_bone.name
                 active_solo = active[len(ik_bone_prefix):]
                 active_solo = ik_bone_prefix + active_solo
                 print(active_solo)
-                armature = bpy.context.active_object
+                armature = context.object
                 switch_Bone = getPoleBone(armature, active_solo)
                 if switch_Bone == None:
                     pass
                 else:
                     if active == switch_Bone[2]:
-                        pie.operator('ot.fk_snap', icon = 'EVENT_A', text="snap ik")
+                        pie.operator('ot.fk_snap', icon = 'EVENT_A', text="switch to ik")
                     if active == (fk_bone_prefix + switch_Bone[2][len(ik_bone_prefix):]):
-                        pie.operator('ot.ik_snap', icon = 'EVENT_B', text="snap fk")
+                        pie.operator('ot.ik_snap', icon = 'EVENT_B', text="switch to fk")
+                    #if find_follow(context.object,context.active_pose_bone):
+                        #pie.prop(find_follow(context.object,context.active_pose_bone),'["Follow"]',slider= True)
+
+
            
             
             
@@ -127,7 +146,7 @@ class VIEW3D_MT_PIE(bpy.types.Menu):
             b = box.box()
             column = b.column()
             self.draw_center_column(bpy.context.scene, b)
-            #pie.prop(bpy.context.scene.tool_settings, "transform_pivot_point", expand=True)
+
             
             #draw pivor point
     def draw_left_column(self, scene, layout):
