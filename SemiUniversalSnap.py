@@ -27,14 +27,14 @@ def find_follow(obj,bone):
                 if "Follow" in ogbone:
                     return ogbone
     
-def ik_to_fk():
+def ik_to_fk(obj):
         # Loop through each bone in the armature
-    armature = bpy.context.active_object
-    pbone = armature.pose.bones
+
+    pbone = obj.pose.bones
     active = bpy.context.active_pose_bone.name
     active = active[len(fk_bone_prefix):]
     active = ik_bone_prefix + active
-    ikPoleData = getPoleBone(armature,active)
+    ikPoleData = getPoleBone(obj,active)
     ikBone = ikPoleData[1][len(ik_bone_prefix):]
     endBone =  ikPoleData[0][len(ik_bone_prefix):]
     TargetBone = ikPoleData[2][len(ik_bone_prefix):]
@@ -45,24 +45,26 @@ def ik_to_fk():
     barycenter = (pbone[fk_bone_prefix + endBone].head + pbone[fk_bone_prefix + endBone].tail + pbone[fk_bone_prefix + ikBone].tail)/3 
     fkPole = ( pbone[fk_bone_prefix + endBone].tail - barycenter) * 2 
     #get fk pole vector and convert to matrix
-    print(fkPole)
+
     fkPole =   mathutils.Matrix.Translation(fkPole) @ ( pbone[fk_bone_prefix + ikBone].matrix) 
     pbone[ik_bone_prefix + TargetBone].matrix =  pbone[fk_bone_prefix + TargetBone].matrix
+    bpy.context.view_layer.update()
     pbone[ik_bone_prefix + PoleBone].matrix = fkPole
+    bpy.context.view_layer.update()
     
     
      
     #print(armature.pose.bones[fk_bone_prefix + ikBone].matrix )
     
         
-def fk_to_ik():
+def fk_to_ik(obj):
     active =  bpy.context.active_pose_bone.name
     active = active[len(fk_bone_prefix):]
     active = ik_bone_prefix + active
-    armature = bpy.context.active_object
-    IKBones = getPoleBone(armature,active)
+
+    IKBones = getPoleBone(obj, active)
     for i in range(3):
-       armature.pose.bones[fk_bone_prefix + IKBones[i][len(ik_bone_prefix):]].matrix = armature.pose.bones[IKBones[i]].matrix.copy()
+       obj.pose.bones[fk_bone_prefix + IKBones[i][len(ik_bone_prefix):]].matrix = obj.pose.bones[IKBones[i]].matrix.copy()
        bpy.context.view_layer.update() 
 
 
@@ -75,11 +77,14 @@ class OT_Ik_Snap(bpy.types.Operator):
     bl_label = "Snap ik to fk"
 
     def execute(self, context):
-            ik_to_fk()
+            ik_to_fk(context.object)
             if find_follow(context.object, context.active_pose_bone):
-                find_follow(context.object, context.active_pose_bone)["Follow"] = 0.0
-                find_follow(context.object, context.active_pose_bone).keyframe_insert('["Follow"]')
-
+                propbone = find_follow(context.object, context.active_pose_bone)
+                propbone["Follow"] = 1.0
+                propbone.keyframe_insert('["Follow"]', frame=  context.scene.frame_current - 1)
+                propbone["Follow"] = 0.0
+                propbone.keyframe_insert('["Follow"]')
+                context.active_pose_bone.matrix = context.active_pose_bone.matrix
             return {'FINISHED'}
 class OT_Fk_Snap(bpy.types.Operator):
     """snap fk boens to ik """
@@ -87,10 +92,14 @@ class OT_Fk_Snap(bpy.types.Operator):
     bl_label = "Snap fk to ik"
 
     def execute(self, context):
-            fk_to_ik()
+            fk_to_ik(context.object)
             if find_follow(context.object, context.active_pose_bone):
-                find_follow(context.object, context.active_pose_bone)["Follow"] = 1.0
-                find_follow(context.object, context.active_pose_bone).keyframe_insert('["Follow"]')
+                propbone = find_follow(context.object, context.active_pose_bone)
+                propbone["Follow"] = 0.0
+                propbone.keyframe_insert('["Follow"]',frame=context.scene.frame_current - 1)
+                propbone["Follow"] = 1.0
+                propbone.keyframe_insert('["Follow"]')
+                context.active_pose_bone.matrix = context.active_pose_bone.matrix
 
             return {'FINISHED'}
     
@@ -120,9 +129,9 @@ class VIEW3D_MT_PIE(bpy.types.Menu):
                 active = context.active_pose_bone.name
                 active_solo = active[len(ik_bone_prefix):]
                 active_solo = ik_bone_prefix + active_solo
-                print(active_solo)
-                armature = context.object
-                switch_Bone = getPoleBone(armature, active_solo)
+
+
+                switch_Bone = getPoleBone(context.object, active_solo)
                 if switch_Bone == None:
                     pass
                 else:
